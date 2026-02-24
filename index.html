@@ -2,88 +2,86 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GD Clone v1</title>
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>GD Mobile Fix</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; }
-        canvas { display: block; background: #007aff; border-bottom: 5px solid #fff; }
-        #ui { position: absolute; top: 10px; left: 10px; color: white; pointer-events: none; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; }
+        canvas { display: block; background: #15a; width: 100vw; height: 100vh; }
     </style>
 </head>
-<body onclick="jump()">
-    <div id="ui">Tap to Jump!</div>
-    <canvas id="gameCanvas"></canvas>
+<body ontouchstart="jump(event)">
+    <canvas id="game"></canvas>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
+        const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = 400;
+        
+        // Better resolution handling for iPhone Retina screens
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        ctx.scale(dpr, dpr);
 
-        let player = { x: 50, y: 300, size: 30, dy: 0, gravity: 0.6, jumpPower: -12, grounded: false };
-        let obstacles = [{ x: 500, w: 30, h: 30 }];
-        let gameSpeed = 5;
+        let player = { x: 50, y: 0, size: 30, dy: 0, jump: -10, gravity: 0.6, grounded: false };
+        let floor = window.innerHeight * 0.7;
+        let obstacles = [];
 
-        function jump() {
+        function jump(e) {
+            e.preventDefault(); // Prevents the browser from scrolling/zooming
             if (player.grounded) {
-                player.dy = player.jumpPower;
+                player.dy = player.jump;
                 player.grounded = false;
             }
         }
 
-        function update() {
-            // Physics
+        function loop() {
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+            
             player.dy += player.gravity;
             player.y += player.dy;
 
-            // Ground Collision
-            if (player.y > 300) {
-                player.y = 300;
+            if (player.y > floor - player.size) {
+                player.y = floor - player.size;
                 player.dy = 0;
                 player.grounded = true;
             }
 
-            // Move obstacles
-            obstacles.forEach(obs => {
-                obs.x -= gameSpeed;
-                if (obs.x < -50) obs.x = canvas.width + Math.random() * 300;
-                
-                // Simple Collision Detection
-                if (player.x < obs.x + obs.w && player.x + player.size > obs.x &&
-                    player.y < 300 + obs.h && player.y + player.size > 300) {
-                    resetGame();
-                }
-            });
-        }
+            // Draw Ground
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, floor, window.innerWidth, 5);
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             // Draw Player
-            ctx.fillStyle = "#fff";
+            ctx.fillStyle = "#0ff";
             ctx.fillRect(player.x, player.y, player.size, player.size);
-            
-            // Draw Obstacles (Triangles)
-            ctx.fillStyle = "#ff3b30";
-            obstacles.forEach(obs => {
+
+            // Obstacles
+            if (Math.random() < 0.01) {
+                obstacles.push({ x: window.innerWidth, w: 30, h: 30 });
+            }
+
+            ctx.fillStyle = "#f33";
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= 7; // Increased speed for better "feel"
+
+                // Draw Spike
                 ctx.beginPath();
-                ctx.moveTo(obs.x, 330);
-                ctx.lineTo(obs.x + obs.w/2, 330 - obs.h);
-                ctx.lineTo(obs.x + obs.w, 330);
+                ctx.moveTo(obs.x, floor);
+                ctx.lineTo(obs.x + obs.w/2, floor - obs.h);
+                ctx.lineTo(obs.x + obs.w, floor);
                 ctx.fill();
-            });
 
-            requestAnimationFrame(() => {
-                update();
-                draw();
-            });
+                // Hit Detection
+                if (player.x < obs.x + obs.w && player.x + player.size > obs.x && player.y + player.size > floor - obs.h) {
+                    obstacles = []; // Reset instead of reload for less lag
+                }
+                
+                if (obs.x < -50) obstacles.splice(i, 1);
+            }
+
+            requestAnimationFrame(loop);
         }
-
-        function resetGame() {
-            player.y = 300;
-            obstacles[0].x = canvas.width;
-        }
-
-        draw();
+        loop();
     </script>
 </body>
 </html>
