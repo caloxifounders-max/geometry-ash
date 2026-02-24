@@ -2,85 +2,102 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>GD Mobile Fix</title>
+    <title>Stereo Madness v1</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; }
-        canvas { display: block; background: #15a; width: 100vw; height: 100vh; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; background: #512da8; } /* Purple/Blue background */
+        #progress { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 20px; font-weight: bold; }
     </style>
 </head>
 <body ontouchstart="jump(event)">
+    <div id="progress">0%</div>
     <canvas id="game"></canvas>
 
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        
-        // Better resolution handling for iPhone Retina screens
         const dpr = window.devicePixelRatio || 1;
         canvas.width = window.innerWidth * dpr;
         canvas.height = window.innerHeight * dpr;
         ctx.scale(dpr, dpr);
 
-        let player = { x: 50, y: 0, size: 30, dy: 0, jump: -10, gravity: 0.6, grounded: false };
+        let player = { x: 100, y: 0, size: 30, dy: 0, jump: -11, gravity: 0.7, rotation: 0 };
         let floor = window.innerHeight * 0.7;
-        let obstacles = [];
+        let gameActive = true;
+        let distance = 0;
+
+        // Level Data: X position of spikes (distance from start)
+        const stereoMadness = [400, 700, 1000, 1300, 1600, 1800, 2100, 2400]; 
 
         function jump(e) {
-            e.preventDefault(); // Prevents the browser from scrolling/zooming
-            if (player.grounded) {
+            if(e) e.preventDefault();
+            if (player.y >= floor - player.size - 1) {
                 player.dy = player.jump;
-                player.grounded = false;
             }
         }
 
         function loop() {
+            if (!gameActive) return;
+
             ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-            
+            distance += 6; // Move forward
+
+            // Update Progress
+            const percent = Math.min(100, Math.floor((distance / 2500) * 100));
+            document.getElementById('progress').innerText = percent + "%";
+
+            // Physics
             player.dy += player.gravity;
             player.y += player.dy;
 
             if (player.y > floor - player.size) {
                 player.y = floor - player.size;
                 player.dy = 0;
-                player.grounded = true;
+                // Snap rotation to 90 degrees when landing
+                player.rotation = Math.round(player.rotation / 90) * 90;
+            } else {
+                player.rotation += 5; // Rotate while in air
             }
 
             // Draw Ground
-            ctx.fillStyle = "white";
+            ctx.fillStyle = "#fff";
             ctx.fillRect(0, floor, window.innerWidth, 5);
 
-            // Draw Player
+            // Draw Player with Rotation
+            ctx.save();
+            ctx.translate(player.x + player.size/2, player.y + player.size/2);
+            ctx.rotate(player.rotation * Math.PI / 180);
             ctx.fillStyle = "#0ff";
-            ctx.fillRect(player.x, player.y, player.size, player.size);
+            ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
+            ctx.restore();
 
-            // Obstacles
-            if (Math.random() < 0.01) {
-                obstacles.push({ x: window.innerWidth, w: 30, h: 30 });
-            }
-
+            // Draw Level Spikes
             ctx.fillStyle = "#f33";
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i];
-                obs.x -= 7; // Increased speed for better "feel"
-
-                // Draw Spike
-                ctx.beginPath();
-                ctx.moveTo(obs.x, floor);
-                ctx.lineTo(obs.x + obs.w/2, floor - obs.h);
-                ctx.lineTo(obs.x + obs.w, floor);
-                ctx.fill();
-
-                // Hit Detection
-                if (player.x < obs.x + obs.w && player.x + player.size > obs.x && player.y + player.size > floor - obs.h) {
-                    obstacles = []; // Reset instead of reload for less lag
-                }
+            stereoMadness.forEach(spikeX => {
+                let relativeX = spikeX - distance + player.x;
                 
-                if (obs.x < -50) obstacles.splice(i, 1);
-            }
+                if (relativeX > -50 && relativeX < window.innerWidth) {
+                    ctx.beginPath();
+                    ctx.moveTo(relativeX, floor);
+                    ctx.lineTo(relativeX + 15, floor - 30);
+                    ctx.lineTo(relativeX + 30, floor);
+                    ctx.fill();
 
-            requestAnimationFrame(loop);
+                    // Collision detection
+                    if (player.x < relativeX + 25 && player.x + 25 > relativeX && player.y + player.size > floor - 25) {
+                        gameActive = false;
+                        setTimeout(() => location.reload(), 500);
+                    }
+                }
+            });
+
+            if (percent < 100) requestAnimationFrame(loop);
+            else alert("Level Complete!");
         }
+
         loop();
     </script>
 </body>
